@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken')
 
 const handleLogin = async (req, res) => {
     const cookies = req.cookies
-    console.log(`cookie at login: ${JSON.stringify(cookies)}`)
+
     const { user, pwd } = req.body
     if (!user || !pwd) return res.status(400).json({ 'message': 'Username and password are required.' })
 
@@ -14,7 +14,7 @@ const handleLogin = async (req, res) => {
     // evaluate password 
     const match = await bcrypt.compare(pwd, foundUser.password)
     if (match) {
-        const roles = Object.values(foundUser.roles)
+        const roles = Object.values(foundUser.roles).filter(Boolean)
         // create JWTs
         const accessToken = jwt.sign(
             {
@@ -24,33 +24,34 @@ const handleLogin = async (req, res) => {
                 }
             },
             process.env.ACCESS_TOKEN_SECRET,
-            { expiresIn: '1m' }
+            { expiresIn: '10s' }
         )
         const newRefreshToken = jwt.sign(
             { "username": foundUser.username },
             process.env.REFRESH_TOKEN_SECRET,
-            { expiresIn: '1d' }
+            { expiresIn: '15m' }
         )
 
-        let newRefreshTokenArray = !cookies?.jwt ? foundUser.refreshToken : foundUser.refreshToken.filter(token => token !== cookies.jwt)
+        let newRefreshTokenArray = !cookies?.jwt ? foundUser.refreshToken : foundUser.refreshToken.filter(rt => rt !== cookies.jwt)
 
         // checking to see if a refresh token has been used after being stolen when a user has not logged out, and then emptying their refreshToken array in the db forcing them to re-login
         if (cookies?.jwt) {
             const refreshToken = cookies.jwt
             const foundToken = await User.findOne({ refreshToken }).exec()
 
-            if(!foundToken) {
+            if (!foundToken) {
                 console.log('attempted refresh token reuse at login!')
                 newRefreshTokenArray = []
             }
-            res.clearCookie('jwt', { httpOnly: true, sameSite: 'None' }) // in production we will want the secure: true
-        } 
+            res.clearCookie('jwt', { httpOnly: true, sameSite: 'None', secure: true }) // in production we will want the secure: true
+        }
 
         // Saving refreshToken with current user
         foundUser.refreshToken = [...newRefreshTokenArray, newRefreshToken]
         const result = await foundUser.save()
+        console.log(result)
 
-        res.cookie('jwt', newRefreshToken, { httpOnly: true, sameSite: 'None', maxAge: 24 * 60 * 60 * 1000 }) // in production we will want the secure: true
+        res.cookie('jwt', newRefreshToken, { httpOnly: true, sameSite: 'None', secure: true, maxAge: 24 * 60 * 60 * 1000 }) // in production we will want the secure: true
         res.json({ accessToken })
     } else {
         res.sendStatus(401)

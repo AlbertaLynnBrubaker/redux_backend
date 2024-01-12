@@ -5,7 +5,7 @@ const handleRefreshToken = async (req, res) => {
     const cookies = req.cookies
     if (!cookies?.jwt) return res.sendStatus(401)
     const refreshToken = cookies.jwt
-    res.clearCookie('jwt', { httpOnly: true, sameSite: 'None' }) // in production we will want the secure: true
+    res.clearCookie('jwt', { httpOnly: true, sameSite: 'None', secure: true }) // in production we will want the secure: true
 
     const foundUser = await User.findOne({ refreshToken }).exec()
 
@@ -27,7 +27,7 @@ const handleRefreshToken = async (req, res) => {
         return res.sendStatus(403) //Forbidden 
     }
 
-    const newRefreshTokenArray = foundUser.refreshToken.filter(token => token !== refreshToken)
+    const newRefreshTokenArray = foundUser.refreshToken.filter(rt => rt !== refreshToken)
     // evaluate jwt 
     jwt.verify(
         refreshToken,
@@ -51,21 +51,22 @@ const handleRefreshToken = async (req, res) => {
                     }
                 },
                 process.env.ACCESS_TOKEN_SECRET,
-                { expiresIn: '1m' }
+                { expiresIn: '10s' }
             )
 
             const newRefreshToken = jwt.sign(
                 { "username": foundUser.username },
                 process.env.REFRESH_TOKEN_SECRET,
-                { expiresIn: '1d' }
+                { expiresIn: '15m' }
             )
             // Saving refreshToken with current user
             foundUser.refreshToken = [...newRefreshTokenArray, newRefreshToken]
             const result = await foundUser.save()
+            console.log(result)
 
-            res.cookie('jwt', newRefreshToken, { httpOnly: true, sameSite: 'None', maxAge: 24 * 60 * 60 * 1000 }) // in production we will want the secure: true
+            res.cookie('jwt', newRefreshToken, { httpOnly: true, sameSite: 'None', secure: true, maxAge: 24 * 60 * 60 * 1000 }) // in production we will want the secure: true
 
-            res.json({ roles, accessToken })
+            res.json({ accessToken })
         }
     )
 }

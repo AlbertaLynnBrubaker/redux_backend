@@ -16,9 +16,6 @@ const PORT = process.env.PORT || 3500
 // Connect to MongoDB
 connectDB()
 
-//middleware for cookies
-app.use(cookieParser())
-
 // custom middleware logger
 app.use(logger)
 
@@ -34,6 +31,9 @@ app.use(express.urlencoded({ extended: false }))
 
 // built-in middleware for json 
 app.use(express.json())
+
+//middleware for cookies
+app.use(cookieParser())
 
 
 //serve static files
